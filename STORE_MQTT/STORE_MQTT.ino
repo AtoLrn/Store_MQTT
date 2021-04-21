@@ -6,12 +6,7 @@
 
 #include <ESP8266WiFi.h>
 
-
-//DEF DES INFORMATIONS RESEAUX
-const char* ssid = "XXXXXXXXX";
-const char* password = "XXXXXXXXXX";
-const char* mqtt_server = "192.168.X.XX";
-
+#include "config.h"
 
 int Nb=0;
 int Nb2=0;
@@ -37,9 +32,6 @@ PubSubClient client(espClient);
 #define PinSensDroit 2 //D4
 #define Bouton 14//D5
 #define Bouton2 16 //D0
-
-
-
 
 long lastMsg = millis();
 
@@ -89,34 +81,6 @@ void callback(char* topic, byte* payload, unsigned int length) {
     right_get_step(f);
     left_get_step(f);
   }
-  /*String s = String((char*)payload);
-  
-  float f = s.toInt();
-
-
-  String test = "";
-  for (int i = 0;i<length;i++){
-    
-    test += String((char)payload[i]);
-  }
-
-  f=test.toInt();
-
-  
-  // Switch on the LED if an 1 was received as first character
-  if (String(topic) == ("NodeMcu/Store/droite")) {
-    //Serial.println("Store Droite");
-    right_get_step(f);
-    } 
-  else if (String(topic) == ("NodeMcu/Store/gauche")){
-    //Serial.println("Store gauche");
-    left_get_step(f);
-
-  }
-  */
-
-
-
 }
 
 void reconnect() {
@@ -127,7 +91,7 @@ void reconnect() {
     String clientId = "ESP8266Client-";
     clientId += String(random(0xffff), HEX);
     // Attempt to connect
-    if (client.connect(clientId.c_str())) {
+    if (client.connect(clientId.c_str(), USERNAME, PASSWORD)) {
       Serial.println("connected");
       client.subscribe("domoticz/out");
       client.subscribe("NodeMcu/Store/gauche");
@@ -143,6 +107,22 @@ void reconnect() {
     }
   }
 }
+
+void publishSetup() {
+  DynamicJsonDocument doc(1048);
+  doc["name"] = "Store MQTT";
+  doc["command_topic"] = "homeassistant/cover/StoreMQTT/set";
+  doc["position_topic"] = "homeassistant/cover/StoreMQTT/position";
+  doc["set_position_topic"] = "homeassistant/cover/StoreMQTT/set_position";
+  doc["position_open"] = 100;
+  doc["position_closed"] = 0;
+
+  char string[1048];
+  serializeJson(doc, &string, 1048);
+   
+  client.publish("homeassistant/cover/StoreMQTT/config", string, true);
+}
+
 void setup() {
   pinMode(MoteurGauche, OUTPUT);
   pinMode(MoteurDroit, OUTPUT);
@@ -154,21 +134,12 @@ void setup() {
   setup_wifi();
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
+
   
   Serial.println("End Setup");
-}
 
-/* void envoiTemperature(){
-  float newTemp = dht.readTemperature();
-  float newHum = dht.readHumidity();
-  Serial.println("Envoi d'informations");
-  Serial.println(newTemp);
-  Serial.println(newHum);
-    
-  client.publish("test2/lol2", String(newHum).c_str(), true);
-  client.publish("test2/lol", String(newTemp).c_str(), true);
-  
-}*/
+  publishSetup();
+}
 
 void SetupGauche(){
   

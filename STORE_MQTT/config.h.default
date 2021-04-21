@@ -1,0 +1,7 @@
+//DEF DES INFORMATIONS RESEAUX
+const char* ssid = "XXXXXXXXX";
+const char* password = "XXXXXXXXXX";
+const char* mqtt_server = "XXX.XXX.XX.XX";
+
+#define USERNAME "username"
+#define PASSWORD "password"
