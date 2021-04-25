@@ -1,3 +1,5 @@
+#define MQTT_MAX_PACKET_SIZE 1048
+
 #include <PubSubClient.h>
 #include <ArduinoOTA.h>
 #include <ArduinoJson.h>
@@ -5,7 +7,6 @@
 //VERSION 18/04/2001
 
 #include <ESP8266WiFi.h>
-
 #include "config.h"
 
 int Nb=0;
@@ -33,51 +34,44 @@ PubSubClient client(espClient);
 #define Bouton 14//D5
 #define Bouton2 16 //D0
 
+#define PinRightEnable 15 //Temp
+#define PinLeftEnable 17 //Temp
+
 long lastMsg = millis();
 
 void setup_wifi() {
-
   delay(10);
-  // We start by connecting to a WiFi network
-  //Serial.println();
-  //Serial.print("Connecting to ");
-  Serial.println(ssid);
-
   WiFi.begin(ssid, password);
 
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
+  WiFi.setAutoReconnect(true);
+  WiFi.persistent(true);
 
   randomSeed(micros());
-
-  //Serial.println("");
-  //Serial.println("WiFi connected");
-  //Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
 }
 
-void callback(char* topic, byte* payload, unsigned int length) {
-  StaticJsonDocument<256> doc;
-  deserializeJson(doc, payload, length);
-  String str = doc["idx"];
-
-  Serial.println(str);
-
-  if (str == "61"){
-    int f = doc["svalue1"];
-    Serial.println(f);
-    right_get_step(f);
-    left_get_step(f);
+void callback(char* topic, byte* payload, unsigned int length) {  
+  char finalString[255];
+  
+   for (int i=0;i<length;i++) {
+    finalString[i] = (char)payload[i];
   }
+  finalString[length] = 0;
+
+  if (strcmp(finalString, "OPEN") == 0)   Serial.println("OUVERT");
+  else if (strcmp(finalString, "CLOSE") == 0)   Serial.println("FERME");
+  else Serial.println(finalString);
+
+  client.publish("homeassistant/cover/StoreMQTT/position", finalString);
+
+  
 }
 
 void reconnect() {
-  // Loop until we're reconnected
   while (!client.connected()) {
-    Serial.print("Attempting MQTT connection...");
-    // Create a random client ID
     String clientId = "ESP8266Client-";
     clientId += String(random(0xffff), HEX);
     // Attempt to connect
@@ -95,6 +89,7 @@ void reconnect() {
       delay(5000);
     }
   }
+  publishSetup();
 }
 
 void publishSetup() {
@@ -108,8 +103,10 @@ void publishSetup() {
 
   char string[1048];
   serializeJson(doc, &string, 1048);
-   
-  client.publish("homeassistant/cover/StoreMQTT/config", string, true);
+
+  Serial.println(string);
+  client.publish("homeassistant/cover/StoreMQTT/config", string);
+  client.publish("homeassistant/cover/StoreMQTT/position", "75");
 }
 
 void setup() {
@@ -144,7 +141,6 @@ void setup() {
   
   Serial.println("End Setup");
   ArduinoOTA.begin();
-  publishSetup();
 }
 
 void SetupGauche(){
@@ -247,6 +243,7 @@ void SetupDroit(){
 void loop() {
   ArduinoOTA.handle();
   yield();
+  
   if (left_move != 0 && right_move !=0){
     digitalWrite(MoteurDroit, HIGH);
     digitalWrite(MoteurGauche, HIGH);
@@ -254,41 +251,35 @@ void loop() {
     digitalWrite(MoteurDroit, LOW);
     digitalWrite(MoteurGauche, LOW);
     delayMicroseconds(1000); 
-}
-else if (left_move !=0){
-   
-    digitalWrite(MoteurGauche, HIGH);
-    delayMicroseconds(1000);
-    digitalWrite(MoteurGauche, LOW);
-    delayMicroseconds(1000);       
-    
+  }
+  else if (left_move !=0){
+      digitalWrite(MoteurGauche, HIGH);
+      delayMicroseconds(1000);
+      digitalWrite(MoteurGauche, LOW);
+      delayMicroseconds(1000);       
+  }
   
-}
-else if (right_move!=0){
-    digitalWrite(MoteurDroit, HIGH);
-    delayMicroseconds(1000);
-    digitalWrite(MoteurDroit, LOW);
-    delayMicroseconds(1000);
-}
+  else if (right_move!=0){
+      digitalWrite(MoteurDroit, HIGH);
+      delayMicroseconds(1000);
+      digitalWrite(MoteurDroit, LOW);
+      delayMicroseconds(1000);
+  }
+  
   leftMove();
   rightMove();
   
-  if (digitalRead(Bouton)&& Nb==0){
-    
-    
+  if (digitalRead(Bouton) && Nb==0){
     Temps1 = millis();
     Nb = 1;
-    
     delay(100);
   }
   if (digitalRead(Bouton2)&& Nb2==0){
-    
-    
     Temps1 = millis();
     Nb2 = 1;
-    
     delay(100);
   }
+  
   if ((digitalRead(Bouton)== 0) && Nb==1){
     float Temps2 = millis();
     float TempsT= (Temps2 - Temps1)/1000 ;
@@ -365,7 +356,6 @@ void left_get_step(int high){
 
 
 void leftMove(){
-  
   if (left_move>0){
       left_move--;
       left_state++;
@@ -375,21 +365,23 @@ void leftMove(){
       digitalWrite(PinSensGauche,LOW);
       left_state--;
       left_move++;      
+  } else {
+      digitalWrite(PinLeftEnable,LOW);
   }
  
 }
 void rightMove(){
   if (right_move>0){
-      //Serial.println(right_move);
       right_move--;
       right_state++;
       digitalWrite(PinSensDroit,LOW);
   }
   else if (right_move<0){ 
-      //Serial.println(right_move);
       digitalWrite(PinSensDroit,HIGH);
       right_move++;
       right_state--;
       
-  } 
+  } else {
+      digitalWrite(PinRightEnable,LOW);
+  }
 }
