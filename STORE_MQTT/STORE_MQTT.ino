@@ -4,7 +4,7 @@
 #include <ArduinoOTA.h>
 #include <ArduinoJson.h>
 
-//VERSION 18/04/2001
+//VERSION 09/05/2021
 
 #include <ESP8266WiFi.h>
 #include "config.h"
@@ -27,15 +27,15 @@ unsigned long FinalStep;
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-#define MoteurGauche 5//D1
-#define MoteurDroit 4 //D2
-#define PinSensGauche 0 //D3
-#define PinSensDroit 2 //D4
-#define Bouton 14//D5
-#define Bouton2 16 //D0
+#define MoteurGauche 2
+#define MoteurDroit 13 
+#define PinSensGauche 14 
+#define PinSensDroit 15 
+#define Bouton 5
+#define Bouton2 4 
 
-#define PinRightEnable 15 //Temp
-#define PinLeftEnable 17 //Temp
+#define PinRightEnable 12 
+#define PinLeftEnable 0 
 
 long lastMsg = millis();
 
@@ -61,13 +61,21 @@ void callback(char* topic, byte* payload, unsigned int length) {
   }
   finalString[length] = 0;
 
-  if (strcmp(finalString, "OPEN") == 0)   Serial.println("OUVERT");
-  else if (strcmp(finalString, "CLOSE") == 0)   Serial.println("FERME");
-  else Serial.println(finalString);
-
-  client.publish("homeassistant/cover/StoreMQTT/position", finalString);
-
-  
+  if (strcmp(finalString, "OPEN") == 0) {
+    // SET OPEN TO 100%
+   right_get_step(100);
+   left_get_step(100);
+   client.publish("homeassistant/cover/StoreMQTT/position", "100");
+  } else if (strcmp(finalString, "CLOSE") == 0) {
+   right_get_step(0);
+   left_get_step(0);  
+   client.publish("homeassistant/cover/StoreMQTT/position", "0");
+  }
+  else {
+    right_get_step(atoi(finalString));
+    left_get_step(atoi(finalString)); 
+    client.publish("homeassistant/cover/StoreMQTT/position", finalString);
+  }  
 }
 
 void reconnect() {
@@ -106,7 +114,7 @@ void publishSetup() {
 
   Serial.println(string);
   client.publish("homeassistant/cover/StoreMQTT/config", string);
-  client.publish("homeassistant/cover/StoreMQTT/position", "75");
+  client.publish("homeassistant/cover/StoreMQTT/position", "0");
 }
 
 void setup() {
@@ -118,6 +126,7 @@ void setup() {
   pinMode(Bouton, INPUT);
   Serial.begin(9600);
   setup_wifi();
+
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
 
@@ -141,6 +150,7 @@ void setup() {
   
   Serial.println("End Setup");
   ArduinoOTA.begin();
+  digitalWrite(LED_BUILTIN, LOW);
 }
 
 void SetupGauche(){
