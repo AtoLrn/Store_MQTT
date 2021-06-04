@@ -3,6 +3,7 @@
 #include <PubSubClient.h>
 #include <ArduinoOTA.h>
 #include <ArduinoJson.h>
+#include <EEPROM.h>
 
 //VERSION 09/05/2021
 
@@ -33,6 +34,9 @@ PubSubClient client(espClient);
 #define PinSensDroit 15 
 #define Bouton 5
 #define Bouton2 4 
+#define EEPROM_RIGHT_TOTAL_STEP 0
+#define EEPROM_LEFT_TOTAL_STEP 1
+
 
 #define PinRightEnable 12 
 #define PinLeftEnable 0 
@@ -127,6 +131,14 @@ void setup() {
   Serial.begin(9600);
   setup_wifi();
 
+  if (digitalRead(Bouton) && digitalRead(Bouton2)) {
+      EEPROM.write(EEPROM_RIGHT_TOTAL_STEP, 0);
+      EEPROM.write(EEPROM_LEFT_TOTAL_STEP, 0);
+  } else {
+     EEPROM.get(EEPROM_LEFT_TOTAL_STEP, total_step_left);
+     EEPROM.get(EEPROM_RIGHT_TOTAL_STEP, total_step_right);
+  }
+
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
 
@@ -197,6 +209,7 @@ void SetupGauche(){
   }
   Serial.println("Configuration gauche finie");
   Serial.println(total_step_left);
+  EEPROM.write(EEPROM_LEFT_TOTAL_STEP, total_step_left);
   
 }
 
@@ -245,7 +258,8 @@ void SetupDroit(){
   }
   Serial.println("Configuration finie");
   Serial.println(total_step_right);
-  
+  EEPROM.write(EEPROM_RIGHT_TOTAL_STEP, total_step_right);
+
   
 }
 
