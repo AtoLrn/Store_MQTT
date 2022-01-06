@@ -1,4 +1,4 @@
-#define MQTT_MAX_PACKET_SIZE 1048
+#define MQTT_MAX_PACKET_SIZE 2096
 
 #include <PubSubClient.h>
 #include <ArduinoOTA.h>
@@ -102,6 +102,7 @@ void reconnect() {
     }
   }
   publishSetup();
+
 }
 
 void publishSetup() {
@@ -116,7 +117,6 @@ void publishSetup() {
   char string[1048];
   serializeJson(doc, &string, 1048);
 
-  Serial.println(string);
   client.publish("homeassistant/cover/StoreMQTT/config", string);
   client.publish("homeassistant/cover/StoreMQTT/position", "0");
 }
@@ -126,18 +126,33 @@ void setup() {
   pinMode(MoteurDroit, OUTPUT);
   pinMode(PinSensDroit, OUTPUT);
   pinMode(PinSensGauche, OUTPUT);
-  pinMode(Bouton2, INPUT);
-  pinMode(Bouton, INPUT);
+  pinMode(Bouton2, INPUT_PULLUP);
+  pinMode(Bouton, INPUT_PULLUP);
   Serial.begin(9600);
   setup_wifi();
 
-  if (digitalRead(Bouton) && digitalRead(Bouton2)) {
+  if (!digitalRead(Bouton) && !digitalRead(Bouton2)) {
+      Serial.println("Delete of EEPROM Memory");
+      EEPROM.begin(2);
+
       EEPROM.write(EEPROM_RIGHT_TOTAL_STEP, 0);
       EEPROM.write(EEPROM_LEFT_TOTAL_STEP, 0);
+      EEPROM.commit();
+      EEPROM.end();
   } else {
-     EEPROM.get(EEPROM_LEFT_TOTAL_STEP, total_step_left);
-     EEPROM.get(EEPROM_RIGHT_TOTAL_STEP, total_step_right);
+    EEPROM.begin(2);
+     total_step_left = EEPROM.read(EEPROM_LEFT_TOTAL_STEP);
+     total_step_right = EEPROM.read(EEPROM_RIGHT_TOTAL_STEP);
+     EEPROM.end();
   }
+
+  Serial.print("EEPROM Loaded Memory: ");
+
+  Serial.print("LEFT: ");
+  Serial.print(total_step_left);
+
+  Serial.print(" RIGHT: ");  
+  Serial.println(total_step_right);
 
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
@@ -159,10 +174,9 @@ void setup() {
     else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
     else if (error == OTA_END_ERROR) Serial.println("End Failed");
   });
-  
   Serial.println("End Setup");
   ArduinoOTA.begin();
-  digitalWrite(LED_BUILTIN, LOW);
+  digitalWrite(LED_BUILTIN, HIGH);
 }
 
 void SetupGauche(){
@@ -181,7 +195,7 @@ void SetupGauche(){
     delayMicroseconds(1000);
     yield();
     
-    if (digitalRead(Bouton)){
+    if (!digitalRead(Bouton)){
     Statut = 2;
     Serial.println("Up dans 2 sec");
     delay(2000);
@@ -199,7 +213,7 @@ void SetupGauche(){
     total_step_left=1+total_step_left;
     
     yield();
-    if(digitalRead(Bouton)){
+    if(!digitalRead(Bouton)){
       delay(1000);
       Statut = 3;
       left_state = total_step_left;
@@ -209,7 +223,12 @@ void SetupGauche(){
   }
   Serial.println("Configuration gauche finie");
   Serial.println(total_step_left);
+        EEPROM.begin(2);
+
   EEPROM.write(EEPROM_LEFT_TOTAL_STEP, total_step_left);
+  EEPROM.commit();
+  EEPROM.end();
+
   
 }
 
@@ -231,7 +250,7 @@ void SetupDroit(){
     delayMicroseconds(1000);
     
     yield();
-    if (digitalRead(Bouton2)){
+    if (!digitalRead(Bouton2)){
     Statut = 2;
     Serial.println("Up dans 2 sec");
     delay(2000);
@@ -248,7 +267,7 @@ void SetupDroit(){
     total_step_right=1+total_step_right;
     
     yield();
-    if(digitalRead(Bouton2)){
+    if(!digitalRead(Bouton2)){
       delay(1000);
       Statut = 3;
       right_state = total_step_right;
@@ -258,7 +277,11 @@ void SetupDroit(){
   }
   Serial.println("Configuration finie");
   Serial.println(total_step_right);
+  EEPROM.begin(2);
   EEPROM.write(EEPROM_RIGHT_TOTAL_STEP, total_step_right);
+  EEPROM.commit();
+  EEPROM.end();
+
 
   
 }
@@ -267,7 +290,8 @@ void SetupDroit(){
 void loop() {
   ArduinoOTA.handle();
   yield();
-  
+
+
   if (left_move != 0 && right_move !=0){
     digitalWrite(MoteurDroit, HIGH);
     digitalWrite(MoteurGauche, HIGH);
@@ -293,18 +317,22 @@ void loop() {
   leftMove();
   rightMove();
   
-  if (digitalRead(Bouton) && Nb==0){
+  if (!digitalRead(Bouton) && Nb==0){
+    Serial.println("Pressing Left");
+
     Temps1 = millis();
     Nb = 1;
     delay(100);
   }
-  if (digitalRead(Bouton2)&& Nb2==0){
+  
+  if (!digitalRead(Bouton2)&& Nb2==0){
+    Serial.println("Pressing Right");
     Temps1 = millis();
     Nb2 = 1;
     delay(100);
   }
   
-  if ((digitalRead(Bouton)== 0) && Nb==1){
+  if ((!digitalRead(Bouton)== 0) && Nb==1){
     float Temps2 = millis();
     float TempsT= (Temps2 - Temps1)/1000 ;
     Nb=0;
@@ -318,7 +346,7 @@ void loop() {
       delay(200);
     }
   }
-    if ((digitalRead(Bouton2)== 0) && Nb2==1){
+   if ((!digitalRead(Bouton2)== 0) && Nb2==1){
     float Temps2 = millis();
     float TempsT= (Temps2 - Temps1)/1000 ;
     Nb2=0;
@@ -381,7 +409,7 @@ void left_get_step(int high){
 
 void leftMove(){
   if (left_move>0){
-      left_move--;
+      left_move--; // left_move = left_move - 1
       left_state++;
       digitalWrite(PinSensGauche,HIGH);
   }
