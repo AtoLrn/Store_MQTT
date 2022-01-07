@@ -1,4 +1,4 @@
-#define MQTT_MAX_PACKET_SIZE 2096
+ #define MQTT_MAX_PACKET_SIZE 2096
 
 #include <PubSubClient.h>
 #include <ArduinoOTA.h>
@@ -34,6 +34,9 @@ PubSubClient client(espClient);
 #define PinSensDroit 15 
 #define Bouton 5
 #define Bouton2 4 
+#define motor_left_enable 0 // D3
+#define motor_right_enable 12 // D6
+
 #define EEPROM_RIGHT_TOTAL_STEP 0
 #define EEPROM_LEFT_TOTAL_STEP 1
 
@@ -128,6 +131,12 @@ void setup() {
   pinMode(PinSensGauche, OUTPUT);
   pinMode(Bouton2, INPUT_PULLUP);
   pinMode(Bouton, INPUT_PULLUP);
+  pinMode(motor_left_enable, OUTPUT);
+  pinMode(motor_right_enable, OUTPUT); 
+
+  digitalWrite(motor_left_enable, LOW);
+  digitalWrite(motor_right_enable, LOW);
+  
   Serial.begin(9600);
   setup_wifi();
 
@@ -180,7 +189,7 @@ void setup() {
 }
 
 void SetupGauche(){
-  
+  digitalWrite(LED_BUILTIN, LOW);
   delay(500);
   total_step_left = 0;
   int Statut = 1;
@@ -223,17 +232,16 @@ void SetupGauche(){
   }
   Serial.println("Configuration gauche finie");
   Serial.println(total_step_left);
-        EEPROM.begin(2);
-
+  EEPROM.begin(2);
   EEPROM.write(EEPROM_LEFT_TOTAL_STEP, total_step_left);
   EEPROM.commit();
   EEPROM.end();
-
+  digitalWrite(LED_BUILTIN, HIGH);
   
 }
 
 void SetupDroit(){
-  
+  digitalWrite(LED_BUILTIN, LOW);
   delay(500);
   total_step_right = 0;
   int Statut = 1;
@@ -281,7 +289,7 @@ void SetupDroit(){
   EEPROM.write(EEPROM_RIGHT_TOTAL_STEP, total_step_right);
   EEPROM.commit();
   EEPROM.end();
-
+  digitalWrite(LED_BUILTIN, HIGH);
 
   
 }
@@ -318,15 +326,12 @@ void loop() {
   rightMove();
   
   if (!digitalRead(Bouton) && Nb==0){
-    Serial.println("Pressing Left");
-
     Temps1 = millis();
     Nb = 1;
     delay(100);
   }
   
   if (!digitalRead(Bouton2)&& Nb2==0){
-    Serial.println("Pressing Right");
     Temps1 = millis();
     Nb2 = 1;
     delay(100);
@@ -420,6 +425,8 @@ void leftMove(){
   } else {
       digitalWrite(PinLeftEnable,LOW);
   }
+ digitalWrite(LED_BUILTIN, HIGH);
+
  
 }
 void rightMove(){
